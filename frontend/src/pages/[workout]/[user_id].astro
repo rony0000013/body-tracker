@@ -1,0 +1,42 @@
+---
+// import Welcome from '../components/Welcome.astro';
+// import Layout from '../layouts/Layout.astro';
+export const prerender = false;
+import '../../styles/global.css';
+
+const { workout, user_id } = Astro.params;
+
+if (
+	typeof workout !== "string" ||
+	typeof user_id !== "string" ||
+	!(
+		workout === "squat" ||
+		workout === "pushup" ||
+		workout === "plank" ||
+		workout === "jumping-jack" ||
+		workout === "lunges"
+	)
+) {
+	Astro.redirect("/404");
+}
+
+
+
+const workoutType = workout as string;
+const userId = user_id as string;
+
+import BodyTracker from '../../components/body_tracker.tsx';
+---
+
+<html lang="en">
+	<head>
+		<meta charset="UTF-8" />
+		<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+		<title>Body Tracker</title>
+		<!-- <link rel="stylesheet" href="https://matcha.mizu.sh/matcha.css" /> -->
+	</head>
+
+	<body>
+		<BodyTracker workout={workoutType} userId={userId} client:load />
+	</body>
+</html>

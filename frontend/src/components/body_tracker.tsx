@@ -29,6 +29,9 @@ const WEBSOCKET_URL = import.meta.env.PUBLIC_WEBSOCKET_URL;
 export const TARGET_FPS = 12;
 export const FRAME_INTERVAL_MS = 1000 / TARGET_FPS;
 
+import { initializeApp } from "firebase/app";
+import { getFirestore, collection, setDoc, doc, Timestamp  } from "firebase/firestore";
+
 // Define the structure of the data received from the WebSocket
 interface PoseData {
     keypoints: [number, number][]; // Array of [x, y] tuples
@@ -47,7 +50,6 @@ interface PoseData {
 }
 
 function App(props: { workout: string; userId: string }) {
-
     const workout = props.workout;
     const userId = props.userId;
     let videoRef: HTMLVideoElement | undefined;
@@ -63,6 +65,18 @@ function App(props: { workout: string; userId: string }) {
     const [isStreaming, setIsStreaming] = createSignal(false);
     const [isVideoReady, setIsVideoReady] = createSignal(false);
 
+    const firebaseConfig = {
+        apiKey: import.meta.env.PUBLIC_FIREBASE_API_KEY,
+        authDomain: import.meta.env.PUBLIC_FIREBASE_AUTH_DOMAIN,
+        projectId: import.meta.env.PUBLIC_FIREBASE_PROJECT_ID,
+        storageBucket: import.meta.env.PUBLIC_FIREBASE_STORAGE_BUCKET,
+        messagingSenderId: import.meta.env.PUBLIC_FIREBASE_MESSAGING_SENDER_ID,
+        appId: import.meta.env.PUBLIC_FIREBASE_APP_ID,
+    };
+
+    const fireapp = initializeApp(firebaseConfig);
+    const firedb = getFirestore(fireapp);
+    const firecollection = collection(firedb, "ml_tracking");
     // --- WebSocket Handling ---
 
     const connectWebSocket = () => {
@@ -178,11 +192,35 @@ function App(props: { workout: string; userId: string }) {
         if (videoRef) {
             videoRef.srcObject = null;
         }
+
+        const count = (workout === "squat")
+            ? poseData()?.squat_count
+            : (workout === "pushup")
+            ? poseData()?.pushup_count
+            : (workout === "plank")
+            ? poseData()?.plank_count
+            : (workout === "jumping-jack")
+            ? poseData()?.jumping_jacks_count
+            : (workout === "lunges")
+            ? poseData()?.lunges_count
+            : 0;
+
+        setDoc(doc(firecollection), {
+                uid: userId,
+                timestamp: Timestamp.now(),
+                count: count || 0,
+                workout: workout,
+            })
+            .then(() => {
+                console.log("Document written successfully");
+            })
+            .catch((error) => {
+                console.error("Error adding document: ", error);
+            });
         setIsVideoReady(false);
         setPoseData(null); // Clear pose data when camera stops
         clearCanvas(); // Clear the overlay
     };
-
     const startCameraAndConnect = () => {
         // Start camera/stream logic
         // Connect websocket logic
@@ -397,6 +435,7 @@ function App(props: { workout: string; userId: string }) {
     // Clean up on component unmount
     onCleanup(() => {
         console.log("Cleaning up App component...");
+
         stopCamera(); // Stops stream and sending frames
         ws()?.close(); // Close WebSocket connection
         setWs(null);
